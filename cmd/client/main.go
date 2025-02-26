@@ -24,12 +24,46 @@ func main() {
 		log.Fatal(err)
 	}
 
-	welcome, err := gamelogic.ClientWelcome()
+	username, err := gamelogic.ClientWelcome()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	pubsub.DeclareAndBind(amqpConnection, routing.ExchangePerilDirect, "pause."+welcome, routing.PauseKey, 1)
+	pubsub.DeclareAndBind(amqpConnection, routing.ExchangePerilDirect, "pause."+username, routing.PauseKey, 1)
+
+	gameState := gamelogic.NewGameState(username)
+
+outerloop:
+	for {
+		inputs := gamelogic.GetInput()
+		if len(inputs) == 0 {
+			continue
+		}
+
+		switch inputs[0] {
+		case "spawn":
+			if err := gameState.CommandSpawn(inputs); err != nil {
+				fmt.Println(err)
+			}
+		case "move":
+			gameMove, err := gameState.CommandMove(inputs)
+			if err != nil {
+				fmt.Print(err)
+			}
+			fmt.Print(gameMove)
+		case "status":
+			gameState.CommandStatus()
+		case "help":
+			gamelogic.PrintClientHelp()
+		case "spam":
+			fmt.Println("Spamming not allowed yet!")
+		case "quit":
+			gamelogic.PrintQuit()
+			break outerloop
+		default:
+			fmt.Println("unknown command")
+		}
+	}
 
 	<-signalChan
 	fmt.Println()

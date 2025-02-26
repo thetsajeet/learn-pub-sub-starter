@@ -25,11 +25,17 @@ func main() {
 	}
 	defer amqpConnection.Close()
 
-	amqlChannel, err := amqpConnection.Channel()
+	amqpChannel, err := amqpConnection.Channel()
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Default().Println("Connection successful to AMQP")
+
+	_, _, err = pubsub.DeclareAndBind(amqpConnection, routing.ExchangePerilTopic, routing.GameLogSlug, "game_logs.*", 0)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Default().Println("Created a new game queue")
 
 	gamelogic.PrintServerHelp()
 
@@ -43,12 +49,12 @@ outerloop:
 		switch inputs[0] {
 		case "pause":
 			log.Default().Println("Sending pause message")
-			pubsub.PublishJSON(amqlChannel, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{
+			pubsub.PublishJSON(amqpChannel, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{
 				IsPaused: true,
 			})
 		case "resume":
 			log.Default().Println("Sending a resume message")
-			pubsub.PublishJSON(amqlChannel, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{
+			pubsub.PublishJSON(amqpChannel, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{
 				IsPaused: false,
 			})
 		case "quit":
