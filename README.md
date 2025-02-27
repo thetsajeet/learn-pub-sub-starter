@@ -33,3 +33,11 @@
 - The metadata of a durable queue is stored on disk, while transient queues are only stored in memory.
 - Exclusive: The queue can only be used by the connection that created it.
 - Auto-delete: The queue will be automatically deleted when its last connection is closed.
+
+## Delivery
+
+### Dead Letter Exchanges and Queues
+
+1. In point-to-point systems, client can receive response about the success / failure of requests via http response codes
+2. In decoupled systems, it's not possible as they are not connected / nor they do wait for a response.
+3. To notify / keep tabs of failed processing, a dead letter exchange and queue is created.

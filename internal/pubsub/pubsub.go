@@ -56,13 +56,21 @@ func DeclareAndBind(
 	return amqpChannel, queue, err
 }
 
+type AckType string
+
+const (
+	Ack         AckType = "Ack"
+	NackRequeue AckType = "NackRequeue"
+	NackDiscard AckType = "NackDiscard"
+)
+
 func SubscribeJSON[T any](
 	conn *amqp.Connection,
 	exchange,
 	queueName,
 	key string,
 	simpleQueueType int,
-	handler func(T),
+	handler func(T) AckType,
 ) error {
 	ch, queue, err := DeclareAndBind(conn, exchange, queueName, key, simpleQueueType)
 	if err != nil {
@@ -88,8 +96,19 @@ func SubscribeJSON[T any](
 				fmt.Println(err)
 				continue
 			}
-			handler(target)
-			msg.Ack(false)
+			switch ack := handler(target); ack {
+			case Ack:
+				fmt.Println("ack")
+				msg.Ack(false)
+			case NackRequeue:
+				fmt.Println("nack requeue")
+				msg.Nack(false, true)
+			case NackDiscard:
+				fmt.Println("nack disc")
+				msg.Nack(false, false)
+			default:
+				fmt.Println("unknown ack")
+			}
 		}
 	}()
 
