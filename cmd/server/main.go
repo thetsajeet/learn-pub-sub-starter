@@ -29,7 +29,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Default().Println("Connection successful to AMQP")
+	log.Default().Println("Connection successful to RabbitMQ server")
 
 	_, _, err = pubsub.DeclareAndBind(amqpConnection, routing.ExchangePerilTopic, routing.GameLogSlug, "game_logs.*", 0)
 	if err != nil {
@@ -38,8 +38,6 @@ func main() {
 	log.Default().Println("Created a new game queue")
 
 	gamelogic.PrintServerHelp()
-
-outerloop:
 	for {
 		inputs := gamelogic.GetInput()
 		if len(inputs) == 0 {
@@ -49,23 +47,25 @@ outerloop:
 		switch inputs[0] {
 		case "pause":
 			log.Default().Println("Sending pause message")
-			pubsub.PublishJSON(amqpChannel, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{
+			if err := pubsub.PublishJSON(amqpChannel, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{
 				IsPaused: true,
-			})
+			}); err != nil {
+				fmt.Println(err)
+				continue
+			}
 		case "resume":
 			log.Default().Println("Sending a resume message")
-			pubsub.PublishJSON(amqpChannel, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{
+			if err := pubsub.PublishJSON(amqpChannel, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{
 				IsPaused: false,
-			})
+			}); err != nil {
+				fmt.Println(err)
+				continue
+			}
 		case "quit":
 			log.Default().Println("Exitting")
-			break outerloop
+			return
 		default:
 			fmt.Println("Cannot understand the command")
 		}
 	}
-
-	<-signalChan
-	fmt.Println()
-	log.Default().Println("Stopping Peril Server")
 }

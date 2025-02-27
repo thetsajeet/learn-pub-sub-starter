@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/cmd"
@@ -11,29 +10,15 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) {
-	return func(ps routing.PlayingState) {
-		defer fmt.Print("> ")
-		gs.HandlePause(ps)
-	}
-}
-
-func handlerMove(gs *gamelogic.GameState) func(gamelogic.ArmyMove) {
-	return func(mv gamelogic.ArmyMove) {
-		defer fmt.Print(">")
-		gs.HandleMove(mv)
-	}
-}
-
 func main() {
-	fmt.Println("Starting Peril client...")
+	log.Default().Println("Starting Peril client...")
 
 	amqpConnection, err := amqp.Dial(cmd.CONNECTION_STRING)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer amqpConnection.Close()
-	log.Default().Println("Game client connected to rabbitmq")
+	log.Default().Println("Game client connected to RabbitMQ Server")
 
 	publishCh, err := amqpConnection.Channel()
 	if err != nil {
@@ -45,67 +30,28 @@ func main() {
 		log.Fatal(err)
 	}
 
-	gameState := gamelogic.NewGameState(username)
+	gs := gamelogic.NewGameState(username)
 
 	if err := pubsub.SubscribeJSON(
 		amqpConnection,
 		routing.ExchangePerilDirect,
-		routing.PauseKey+"."+gameState.GetUsername(),
+		routing.PauseKey+"."+gs.GetUsername(),
 		routing.PauseKey,
 		1,
-		handlerPause(gameState),
+		handlerPause(gs),
 	); err != nil {
 		log.Fatal(err)
 	}
 	if err := pubsub.SubscribeJSON(
 		amqpConnection,
 		routing.ExchangePerilTopic,
-		routing.ArmyMovesPrefix+"."+gameState.GetUsername(),
+		routing.ArmyMovesPrefix+"."+gs.GetUsername(),
 		routing.ArmyMovesPrefix+".*",
 		1,
-		handlerMove(gameState),
+		handlerMove(gs),
 	); err != nil {
 		log.Fatal(err)
 	}
 
-	for {
-		inputs := gamelogic.GetInput()
-		if len(inputs) == 0 {
-			continue
-		}
-
-		switch inputs[0] {
-		case "spawn":
-			if err := gameState.CommandSpawn(inputs); err != nil {
-				fmt.Println(err)
-				continue
-			}
-		case "move":
-			gameMove, err := gameState.CommandMove(inputs)
-			if err != nil {
-				fmt.Print(err)
-				continue
-			}
-			if err := pubsub.PublishJSON(
-				publishCh,
-				routing.ExchangePerilTopic,
-				routing.ArmyMovesPrefix+"."+gameMove.Player.Username,
-				gameMove,
-			); err != nil {
-				fmt.Print(err)
-				continue
-			}
-		case "status":
-			gameState.CommandStatus()
-		case "help":
-			gamelogic.PrintClientHelp()
-		case "spam":
-			fmt.Println("Spamming not allowed yet!")
-		case "quit":
-			gamelogic.PrintQuit()
-			return
-		default:
-			fmt.Println("unknown command")
-		}
-	}
+	clientRepl(gs, publishCh)
 }
