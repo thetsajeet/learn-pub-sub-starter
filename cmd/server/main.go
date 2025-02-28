@@ -31,7 +31,7 @@ func main() {
 	}
 	log.Default().Println("Connection successful to RabbitMQ server")
 
-	_, _, err = pubsub.DeclareAndBind(amqpConnection, routing.ExchangePerilTopic, routing.GameLogSlug, "game_logs.*", 0)
+	_, _, err = pubsub.DeclareAndBind(amqpConnection, routing.ExchangePerilTopic, routing.GameLogSlug, "game_logs.*", 0, amqp.Table{})
 	if err != nil {
 		log.Fatal(err)
 	}

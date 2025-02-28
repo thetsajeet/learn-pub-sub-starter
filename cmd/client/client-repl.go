@@ -28,6 +28,7 @@ func clientRepl(gs *gamelogic.GameState, publishCh *amqp.Channel) {
 				fmt.Println(err)
 				continue
 			}
+
 			if err := pubsub.PublishJSON(
 				publishCh,
 				routing.ExchangePerilTopic,

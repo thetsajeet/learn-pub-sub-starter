@@ -48,10 +48,19 @@ func main() {
 		routing.ArmyMovesPrefix+"."+gs.GetUsername(),
 		routing.ArmyMovesPrefix+".*",
 		1,
-		handlerMove(gs),
+		handlerMove(gs, publishCh),
 	); err != nil {
 		log.Fatal(err)
 	}
-
+	if err = pubsub.SubscribeJSON(
+		amqpConnection,
+		routing.ExchangePerilTopic,
+		routing.WarRecognitionsPrefix,
+		routing.WarRecognitionsPrefix+".*",
+		0,
+		handlerWar(gs),
+	); err != nil {
+		log.Fatal(err)
+	}
 	clientRepl(gs, publishCh)
 }

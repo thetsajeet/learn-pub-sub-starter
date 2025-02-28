@@ -33,6 +33,7 @@ func DeclareAndBind(
 	queueName,
 	key string,
 	simpleQueueType int,
+	table amqp.Table,
 ) (*amqp.Channel, amqp.Queue, error) {
 	amqpChannel, err := conn.Channel()
 	if err != nil {
@@ -45,7 +46,7 @@ func DeclareAndBind(
 		simpleQueueType == 1,
 		simpleQueueType == 1,
 		false,
-		nil,
+		table,
 	)
 	if err != nil {
 		return amqpChannel, queue, nil
@@ -72,7 +73,9 @@ func SubscribeJSON[T any](
 	simpleQueueType int,
 	handler func(T) AckType,
 ) error {
-	ch, queue, err := DeclareAndBind(conn, exchange, queueName, key, simpleQueueType)
+	ch, queue, err := DeclareAndBind(conn, exchange, queueName, key, simpleQueueType, amqp.Table{
+		"x-dead-letter-exchange": "peril_dlx",
+	})
 	if err != nil {
 		return err
 	}
@@ -101,7 +104,7 @@ func SubscribeJSON[T any](
 				fmt.Println("ack")
 				msg.Ack(false)
 			case NackRequeue:
-				fmt.Println("nack requeue")
+				fmt.Println("nack")
 				msg.Nack(false, true)
 			case NackDiscard:
 				fmt.Println("nack disc")
