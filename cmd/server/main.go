@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/cmd"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
@@ -13,29 +11,44 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-func main() {
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt)
+func handlerWriteLog() func(gl routing.GameLog) pubsub.AckType {
+	return func(gl routing.GameLog) pubsub.AckType {
+		defer fmt.Print("> ")
+		if err := gamelogic.WriteLog(gl); err != nil {
+			return pubsub.NackRequeue
+		}
+		return pubsub.Ack
+	}
+}
 
+func main() {
 	log.Default().Println("Starting Peril Server")
 
 	amqpConnection, err := amqp.Dial(cmd.CONNECTION_STRING)
 	if err != nil {
+		fmt.Print('s')
 		log.Fatal(err)
 	}
 	defer amqpConnection.Close()
 
 	amqpChannel, err := amqpConnection.Channel()
 	if err != nil {
+		fmt.Print('t')
 		log.Fatal(err)
 	}
 	log.Default().Println("Connection successful to RabbitMQ server")
 
-	_, _, err = pubsub.DeclareAndBind(amqpConnection, routing.ExchangePerilTopic, routing.GameLogSlug, "game_logs.*", 0, amqp.Table{})
-	if err != nil {
+	if err := pubsub.SubscribeGob(
+		amqpConnection,
+		string(routing.ExchangePerilTopic),
+		string(routing.GameLogSlug),
+		string(routing.GameLogSlug)+".*",
+		0,
+		handlerWriteLog(),
+	); err != nil {
+		fmt.Print('d')
 		log.Fatal(err)
 	}
-	log.Default().Println("Created a new game queue")
 
 	gamelogic.PrintServerHelp()
 	for {

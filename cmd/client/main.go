@@ -58,7 +58,7 @@ func main() {
 		routing.WarRecognitionsPrefix,
 		routing.WarRecognitionsPrefix+".*",
 		0,
-		handlerWar(gs),
+		handlerWar(gs, publishCh),
 	); err != nil {
 		log.Fatal(err)
 	}

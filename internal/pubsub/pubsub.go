@@ -1,7 +1,9 @@
 package pubsub
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 
@@ -73,6 +75,7 @@ func SubscribeJSON[T any](
 	simpleQueueType int,
 	handler func(T) AckType,
 ) error {
+
 	ch, queue, err := DeclareAndBind(conn, exchange, queueName, key, simpleQueueType, amqp.Table{
 		"x-dead-letter-exchange": "peril_dlx",
 	})
@@ -101,13 +104,79 @@ func SubscribeJSON[T any](
 			}
 			switch ack := handler(target); ack {
 			case Ack:
-				fmt.Println("ack")
 				msg.Ack(false)
 			case NackRequeue:
-				fmt.Println("nack")
 				msg.Nack(false, true)
 			case NackDiscard:
-				fmt.Println("nack disc")
+				msg.Nack(false, false)
+			default:
+				fmt.Println("unknown ack")
+			}
+		}
+	}()
+
+	return nil
+}
+
+func PublishGob[T any](
+	ch *amqp.Channel,
+	exchange,
+	key string,
+	val T,
+) error {
+	var buffer bytes.Buffer
+	enc := gob.NewEncoder(&buffer)
+	if err := enc.Encode(val); err != nil {
+		return err
+	}
+
+	err := ch.PublishWithContext(context.Background(), exchange, key, false, false, amqp.Publishing{
+		ContentType: "application/gob",
+		Body:        buffer.Bytes(),
+	})
+
+	return err
+}
+
+func SubscribeGob[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	simpleQueueType int,
+	handler func(T) AckType,
+) error {
+	ch, queue, err := DeclareAndBind(conn, exchange, queueName, key, simpleQueueType, nil)
+	if err != nil {
+		return err
+	}
+
+	msgs, err := ch.Consume(queue.Name, "", false, false, false, false, nil)
+	if err != nil {
+		return err
+	}
+
+	unmarshaller := func(data []byte) (T, error) {
+		var target T
+		dec := gob.NewDecoder(bytes.NewBuffer(data))
+		err := dec.Decode(&target)
+		return target, err
+	}
+
+	go func() {
+		defer ch.Close()
+		for msg := range msgs {
+			target, err := unmarshaller(msg.Body)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+			switch ack := handler(target); ack {
+			case Ack:
+				msg.Ack(false)
+			case NackRequeue:
+				msg.Nack(false, true)
+			case NackDiscard:
 				msg.Nack(false, false)
 			default:
 				fmt.Println("unknown ack")
