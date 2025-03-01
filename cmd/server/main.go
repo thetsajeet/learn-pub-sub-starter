@@ -40,9 +40,9 @@ func main() {
 
 	if err := pubsub.SubscribeGob(
 		amqpConnection,
-		string(routing.ExchangePerilTopic),
-		string(routing.GameLogSlug),
-		string(routing.GameLogSlug)+".*",
+		routing.ExchangePerilTopic,
+		routing.GameLogSlug,
+		routing.GameLogSlug+".*",
 		0,
 		handlerWriteLog(),
 	); err != nil {

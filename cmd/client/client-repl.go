@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"strconv"
+	"time"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
@@ -43,7 +45,30 @@ func clientRepl(gs *gamelogic.GameState, publishCh *amqp.Channel) {
 		case "help":
 			gamelogic.PrintClientHelp()
 		case "spam":
-			fmt.Println("Spamming not allowed yet!")
+			if len(inputs) < 2 {
+				fmt.Println("require 2 or more arguments")
+				continue
+			}
+			n, err := strconv.Atoi(inputs[1])
+			if err != nil {
+				fmt.Println("second argument must be a number")
+				continue
+			}
+			for _ = range n {
+				mLog := gamelogic.GetMaliciousLog()
+				if err := pubsub.PublishGob(
+					publishCh,
+					routing.ExchangePerilTopic,
+					routing.GameLogSlug+"."+gs.GetUsername(),
+					routing.GameLog{
+						CurrentTime: time.Now(),
+						Message:     mLog,
+						Username:    gs.GetUsername(),
+					},
+				); err != nil {
+					fmt.Println(err)
+				}
+			}
 		case "quit":
 			gamelogic.PrintQuit()
 			return
